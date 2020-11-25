@@ -231,10 +231,24 @@ export default class XMPP extends Listenable {
                             `Ping NOT supported by ${pingJid} - please enable ping in your XMPP server config`);
                     }
 
-                    // check for speakerstats
+                    let componentFound = false;
+
+                    // check for speakerstats and polls
                     identities.forEach(identity => {
                         if (identity.type === 'speakerstats') {
                             this.speakerStatsComponentAddress = identity.name;
+                            componentFound = true;
+                        }
+
+                        if (identity.type === 'polls') {
+                            this.pollsComponentAddress = identity.name;
+                            componentFound = true;
+                        }
+
+                        if (componentFound) {
+                            this.connection.addHandler(
+                                this._onPrivateMessage.bind(this), null,
+                                'message', null, null);
                         }
 
                         if (identity.type === 'conference_duration') {
@@ -751,6 +765,47 @@ export default class XMPP extends Listenable {
     }
 
     /**
+     * Notifies polls component with a new poll event triggered by
+     * participant.
+     *
+     * @param {String} roomJid - The room jid.
+     * @param {Object} message - The event that happened.
+     */
+    sendPollComponentMessage(roomJid, message) {
+        if (!this.pollsComponentAddress || !roomJid) {
+            return;
+        }
+
+        const msg = $msg({ to: this.pollsComponentAddress });
+
+        if (message) {
+            let messageToSend = message;
+
+            try {
+                messageToSend = JSON.stringify(message);
+            } catch (e) {
+                logger.error('Can not send Poll message, stringify failed: '
+                    , e);
+
+                return;
+            }
+
+            msg.c('polls', {
+                xmlns: 'http://jitsi.org/jitmeet',
+                room: `${roomJid}`,
+                poll: messageToSend })
+                .up();
+        } else {
+            msg.c('polls', {
+                xmlns: 'http://jitsi.org/jitmeet',
+                room: `${roomJid}` })
+                .up();
+        }
+
+        this.connection.send(msg);
+    }
+
+    /**
      * A private message is received, message that is not addressed to the muc.
      * We expect private message coming from plugins component if it is
      * enabled and running.
@@ -761,7 +816,8 @@ export default class XMPP extends Listenable {
         const from = msg.getAttribute('from');
 
         if (!(from === this.speakerStatsComponentAddress
-            || from === this.conferenceDurationComponentAddress)) {
+            || from === this.conferenceDurationComponentAddress
+            || from === this.pollsComponentAddress)) {
             return true;
         }
 
@@ -781,6 +837,14 @@ export default class XMPP extends Listenable {
             && parsedJson.created_timestamp) {
             this.eventEmitter.emit(
                 XMPPEvents.CONFERENCE_TIMESTAMP_RECEIVED, parsedJson.created_timestamp);
+        }
+
+        if (parsedJson
+            && parsedJson[JITSI_MEET_MUC_TYPE] === 'polls'
+            && parsedJson.polls) {
+            const payload = JSON.parse(parsedJson.poll);
+            this.eventEmitter.emit(
+                XMPPEvents.POLL_MESSAGE_RECEIVED, payload);
         }
 
         return true;

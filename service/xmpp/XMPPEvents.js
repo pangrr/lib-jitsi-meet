@@ -184,6 +184,11 @@ const XMPPEvents = {
     PRESENCE_STATUS: 'xmpp.presence_status',
     PROMPT_FOR_LOGIN: 'xmpp.prompt_for_login',
 
+    /**
+     * Indicates that we received a message from polls component.
+     */
+    POLL_MESSAGE_RECEIVED: 'xmpp.poll_message_received',
+    
     // xmpp is connected and obtained user media
     READY_TO_JOIN: 'xmpp.ready_to_join',
 

@@ -60,6 +60,7 @@ import {
     createP2PEvent
 } from './service/statistics/AnalyticsEvents';
 import * as XMPPEvents from './service/xmpp/XMPPEvents';
+import Polls from './modules/polls/polls';
 
 const logger = getLogger(__filename);
 
@@ -405,6 +406,8 @@ JitsiConference.prototype._init = function(options = {}) {
             this.statistics.attachLongTasksStats(this);
         }
     }
+
+    this.polls = new Polls(this, this.xmpp);
 
     this.eventManager.setupChatRoomListeners();
 
@@ -825,6 +828,7 @@ JitsiConference.prototype.removeCommandListener = function(command, handler) {
  */
 JitsiConference.prototype.sendTextMessage = function(
         message, elementName = 'body') {
+    console.log('JitsiConference.prototype.sendTextMessage', message, elementName)
     if (this.room) {
         const displayName = (this.room.getFromPresence('nick') || {}).value;
 
@@ -2585,6 +2589,7 @@ JitsiConference.prototype.sendMessage = function(
             this.sendPrivateTextMessage(to, messageToSend, elementName);
         } else {
             // Broadcast
+            console.log('this.sendTextMessage', messageToSend, elementName)
             this.sendTextMessage(messageToSend, elementName);
         }
     }
@@ -3538,4 +3543,35 @@ JitsiConference.prototype.lobbyApproveAccess = function(id) {
     if (this.room) {
         this.room.getLobby().approveAccess(id);
     }
+};
+
+
+/**
+ * Creates a new poll in the chat room.
+ *
+ * @param {Object} poll - Object containing the information about the poll.
+ * @param {Object} choices - Object containing poll choices by their ID.
+ * @param {Object} question - Object with information about the question asked.
+ * @returns {void}
+ */
+JitsiConference.prototype.startPoll = function(poll, choices, question) {
+  this.polls.startPoll(this.room.roomjid, poll, choices, question);
+};
+
+/**
+* Update the user vote in the currently active poll.
+*
+* @param {string} choiceID - ID of the choice voted for.
+*/
+JitsiConference.prototype.voteInPoll = function(choiceID) {
+  this.polls.voteInPoll(this.room.roomjid, choiceID);
+};
+
+/**
+* End the currently active poll.
+*
+* @returns {void}
+*/
+JitsiConference.prototype.endPoll = function() {
+  this.polls.endPoll(this.room.roomjid);
 };
